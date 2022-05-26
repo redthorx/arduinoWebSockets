@@ -38,21 +38,22 @@ class WebSocketsClient: private WebSockets {
 
         void begin(const char *host, uint16_t port, const char * url = "/");
         void begin(String host, uint16_t port, String url = "/");
+	bool EIOequalsfour();
 
 #if (WEBSOCKETS_NETWORK_TYPE == NETWORK_ESP8266)
-        void beginSSL(const char *host, uint16_t port, const char * url = "/", const char * = "");
-        void beginSSL(String host, uint16_t port, String url = "/", String fingerprint = "");
+        void beginSSL(const char *host, uint16_t port, const char * url = "/");
+        void beginSSL(String host, uint16_t port, String url = "/");
 #endif
 
         void loop(void);
 
         void onEvent(WebSocketClientEvent cbEvent);
 
-        void sendTXT(uint8_t * payload, size_t length = 0, bool headerToPayload = false);
-        void sendTXT(const uint8_t * payload, size_t length = 0);
-        void sendTXT(char * payload, size_t length = 0, bool headerToPayload = false);
-        void sendTXT(const char * payload, size_t length = 0);
-        void sendTXT(String payload);
+        bool sendTXT(uint8_t * payload, size_t length = 0, bool headerToPayload = false);
+        bool sendTXT(const uint8_t * payload, size_t length = 0);
+        bool sendTXT(char * payload, size_t length = 0, bool headerToPayload = false);
+        bool sendTXT(const char * payload, size_t length = 0);
+        bool sendTXT(String payload);
 
         void sendBIN(uint8_t * payload, size_t length, bool headerToPayload = false);
         void sendBIN(const uint8_t * payload, size_t length);
@@ -63,9 +64,6 @@ class WebSocketsClient: private WebSockets {
         String _host;
         uint16_t _port;
 
-#if (WEBSOCKETS_NETWORK_TYPE == NETWORK_ESP8266)
-        String _fingerprint;
-#endif
         WSclient_t _client;
 
         WebSocketClientEvent _cbEvent;

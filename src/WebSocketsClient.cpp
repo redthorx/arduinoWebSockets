@@ -40,10 +40,7 @@ WebSocketsClient::~WebSocketsClient() {
 void WebSocketsClient::begin(const char *host, uint16_t port, const char * url) {
     _host = host;
     _port = port;
-#if (WEBSOCKETS_NETWORK_TYPE == NETWORK_ESP8266)
-    _fingerprint = "";
-#endif
-    
+
     _client.num = 0;
     _client.status = WSC_NOT_CONNECTED;
     _client.tcp = NULL;
@@ -74,14 +71,13 @@ void WebSocketsClient::begin(String host, uint16_t port, String url) {
 }
 
 #if (WEBSOCKETS_NETWORK_TYPE == NETWORK_ESP8266)
-void WebSocketsClient::beginSSL(const char *host, uint16_t port, const char * url, const char * fingerprint) {
+void WebSocketsClient::beginSSL(const char *host, uint16_t port, const char * url) {
     begin(host, port, url);
     _client.isSSL = true;
-    _fingerprint = fingerprint;
 }
 
-void WebSocketsClient::beginSSL(String host, uint16_t port, String url, String fingerprint) {
-    beginSSL(host.c_str(), port, url.c_str(), fingerprint.c_str());
+void WebSocketsClient::beginSSL(String host, uint16_t port, String url) {
+    beginSSL(host.c_str(), port, url.c_str());
 }
 #endif
 
@@ -128,14 +124,6 @@ void WebSocketsClient::loop(void) {
 
 #if (WEBSOCKETS_NETWORK_TYPE == NETWORK_ESP8266)
             _client.tcp->setNoDelay(true);
-
-            if(_client.isSSL && _fingerprint.length()) {
-                if(!_client.ssl->verify(_fingerprint.c_str(), _host.c_str())) {
-                    DEBUG_WEBSOCKETS("[WS-Client] certificate mismatch\n");
-                    WebSockets::clientDisconnect(&_client, 1000);
-                    return;
-                }
-            }
 #endif
 
             // send Header to Server
@@ -165,28 +153,29 @@ void WebSocketsClient::onEvent(WebSocketClientEvent cbEvent) {
  * @param length size_t
  * @param headerToPayload bool  (see sendFrame for more details)
  */
-void WebSocketsClient::sendTXT(uint8_t * payload, size_t length, bool headerToPayload) {
+bool WebSocketsClient::sendTXT(uint8_t * payload, size_t length, bool headerToPayload) {
     if(length == 0) {
         length = strlen((const char *) payload);
     }
     if(clientIsConnected(&_client)) {
         sendFrame(&_client, WSop_text, payload, length, true, true, headerToPayload);
     }
+    return false;
 }
 
-void WebSocketsClient::sendTXT(const uint8_t * payload, size_t length) {
+bool WebSocketsClient::sendTXT(const uint8_t * payload, size_t length) {
     sendTXT((uint8_t *) payload, length);
 }
 
-void WebSocketsClient::sendTXT(char * payload, size_t length, bool headerToPayload) {
+bool WebSocketsClient::sendTXT(char * payload, size_t length, bool headerToPayload) {
     sendTXT((uint8_t *) payload, length, headerToPayload);
 }
 
-void WebSocketsClient::sendTXT(const char * payload, size_t length) {
+bool WebSocketsClient::sendTXT(const char * payload, size_t length) {
     sendTXT((uint8_t *) payload, length);
 }
 
-void WebSocketsClient::sendTXT(String payload) {
+bool WebSocketsClient::sendTXT(String payload) {
     sendTXT((uint8_t *) payload.c_str(), payload.length());
 }
 
@@ -358,9 +347,7 @@ void WebSocketsClient::sendHeader(WSclient_t * client) {
 
     client->cKey = base64_encode(&randomKey[0], 16);
 
-#ifndef NODEBUG_WEBSOCKETS
     unsigned long start = micros();
-#endif
 
     String handshake =  "GET " + client->cUrl + " HTTP/1.1\r\n"
                         "Host: " + _host + "\r\n"
@@ -383,6 +370,17 @@ void WebSocketsClient::sendHeader(WSclient_t * client) {
 
 }
 
+//returns if EIO is more than 4
+bool WebSocketsClient::EIOequalsfour(){
+	if (_client.cUrl.indexOf("EIO=4") != -1){
+         	return true;
+	}
+	else{
+		return false;
+	}
+		
+
+}
 /**
  * handle the WebSocket header reading
  * @param client WSclient_t *  ptr to the client struct
@@ -403,7 +401,7 @@ void WebSocketsClient::handleHeader(WSclient_t * client) {
             String headerValue = headerLine.substring(headerLine.indexOf(':') + 2);
 
             if(headerName.equalsIgnoreCase("Connection")) {
-                if(headerValue.equalsIgnoreCase("Upgrade")) {
+                if(headerValue.indexOf("Upgrade") >= 0) {
                     client->cIsUpgrade = true;
                 }
             } else if(headerName.equalsIgnoreCase("Upgrade")) {
@@ -452,7 +450,7 @@ void WebSocketsClient::handleHeader(WSclient_t * client) {
                 default:   ///< Server dont unterstand requrst
                     ok = false;
                     DEBUG_WEBSOCKETS("[WS-Client][handleHeader] serverCode is not 101 (%d)\n", client->cCode);
-                    clientDisconnect(client);
+                    clientDisconnect(&_client);
                     break;
             }
         }
